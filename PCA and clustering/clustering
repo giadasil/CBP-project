@@ -1,0 +1,60 @@
+import MDAnalysis as mda
+from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
+import numpy as np
+
+# 1. Load the Chimera Universe (the one with the most interesting dynamics)
+#u = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
+#u = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
+u = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
+ca = u.select_atoms("backbone")
+
+# 2. Extract coordinates and flatten them for KMeans
+# We take every 10th frame to save memory (step=10)
+coords = []
+for ts in u.trajectory[::10]:
+    coords.append(ca.positions.flatten())
+coords = np.array(coords)
+
+# 3. Perform K-means (k=3 is usually ideal for a 500ns run)
+n_clusters = 3
+km = KMeans(n_clusters=n_clusters, random_state=42)
+labels = km.fit_predict(coords)
+
+# 4. Plot the clusters over time
+time_ns = np.linspace(0, 500, len(labels))
+plt.figure(figsize=(12, 4))
+plt.scatter(time_ns, labels, c=labels, cmap='viridis', s=2)
+plt.yticks(range(n_clusters), [f"Cluster {i}" for i in range(n_clusters)])
+plt.xlabel("Time (ns)")
+plt.ylabel("Conformational State")
+plt.title("K-means Clustering of WT protein (500 ns)")
+#plt.show()
+
+# 5. Find the most representative frame for each cluster
+for i in range(n_clusters):
+    cluster_indices = np.where(labels == i)[0]
+    # Get the frame closest to the center of the cluster
+    center = km.cluster_centers_[i]
+    distances = np.linalg.norm(coords[cluster_indices] - center, axis=1)
+    best_index = cluster_indices[np.argmin(distances)] * 10 # Multiply by step
+    
+    # Save the PDB
+    u.trajectory[best_index]
+    u.atoms.write(f"wt_cluster_{i}_representative.pdb")
+    print(f"Cluster {i} representative saved from frame {best_index}")
+
+    # Assuming 'labels' is the array of cluster assignments from the previous step
+total_points = len(labels)
+unique, counts = np.unique(labels, return_counts=True)
+percentages = (counts / total_points) * 100
+
+print("--- Cluster Population Analysis ---")
+for cluster_id, percent in zip(unique, percentages):
+    print(f"Cluster {cluster_id}: {percent:.2f}% of the trajectory")
+# Visualization: Bar Chart
+plt.figure(figsize=(8, 5))
+plt.bar([f"Cluster {i}" for i in unique], percentages, color=['#440154', '#21918c', '#fde725'])
+plt.ylabel("Population Percentage (%)")
+plt.title("Time Spent in Each Conformational State (WT protein)")
+plt.show()
