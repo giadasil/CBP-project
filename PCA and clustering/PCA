@@ -1,0 +1,65 @@
+import MDAnalysis as mda
+from MDAnalysis.analysis import pca, align
+import matplotlib.pyplot as plt
+import numpy as np
+import plotly.graph_objects as go
+import pandas as pd
+import plotly.express as px
+
+# 1. Load Universes
+u_wt = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
+u_af = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
+u_ch = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
+
+# 2. Pre-align trajectories to the WT reference structure
+# This ensures motions are internal and not just global rotation/translation
+ref_atoms = u_wt.select_atoms('name CA')
+for u in [u_wt, u_af, u_ch]:
+    alignment = align.AlignTraj(u, u_wt, select='name CA', in_memory=True).run()
+
+# 3. Run PCA on the WT to define the "Reference Space"
+pc_wt = pca.PCA(u_wt, select='name CA').run()
+
+# --- 1. PCA Transformation for 3 Components ---
+# Projecting all systems onto the first 3 WT axes
+wt_3d = pc_wt.transform(u_wt.select_atoms('name CA'), n_components=3)
+af_3d = pc_wt.transform(u_af.select_atoms('name CA'), n_components=3)
+ch_3d = pc_wt.transform(u_ch.select_atoms('name CA'), n_components=3)
+
+# --- PLOT 2: 3D Phase Space (Interactive) ---
+# Function to process each system into a DataFrame for Plotly
+def get_pca_df(projections, label, last_frames=900):
+    df = pd.DataFrame(projections, columns=['first_comp', 'second_comp', 'third_comp'])
+    df['System'] = label
+    # Keep only the last N frames as requested
+    return df.tail(last_frames)
+
+# Create DataFrames
+last_n = 900
+df_wt = get_pca_df(wt_3d, 'Wild Type', last_frames=last_n)
+df_af = get_pca_df(af_3d, 'Gln104Ala AF', last_frames=last_n)
+df_ch = get_pca_df(ch_3d, 'Gln104Ala Chimera', last_frames=last_n)
+
+# Combine for a single interactive plot
+df_all = pd.concat([df_wt, df_af, df_ch])
+
+# Define the specific color mapping
+color_map = {
+    'Wild Type': 'blue',           
+    'Gln104Ala AF': 'green',
+    'Gln104Ala Chimera': 'red'      
+}
+
+ig_comp = px.scatter_3d(
+    df_all, 
+    x='first_comp', 
+    y='second_comp', 
+    z='third_comp', 
+    color='System',
+    color_discrete_map=color_map  # Integrated color logic
+)
+ig_comp.show()
+
+# Update marker size for clarity
+ig_comp.update_traces(marker=dict(size=3))
+ig_comp.show()
