@@ -1,0 +1,39 @@
+import MDAnalysis as mda
+from MDAnalysis.analysis import rms,align
+import matplotlib.pyplot as plt
+
+# 1. Load Universes
+u_wt = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
+u_af = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
+u_ch = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
+
+# 2. RMSF Analysis (Focusing on C-alpha atoms for global backbone flexibility)
+# Note: We align the trajectory to the first frame to ensure we only measure 
+# internal flexibility, not global rotation/translation.
+def get_rmsf(u):
+    average = mda.analysis.align.AverageStructure(u, u, select='name CA', ref_frame=0).run()
+    aligner = mda.analysis.align.AlignTraj(u, average.results.universe, select='name CA').run()
+    rmsf = rms.RMSF(u.select_atoms("name CA")).run()
+    return rmsf.results.rmsf
+
+rmsf_wt = get_rmsf(u_wt)
+rmsf_af = get_rmsf(u_af)
+rmsf_ch = get_rmsf(u_ch)
+
+# 3. Plotting
+plt.figure(figsize=(12, 5))
+resids = u_wt.residues.resids
+
+plt.plot(resids, rmsf_wt, label="Wild Type", color='blue', alpha=0.7)
+plt.plot(resids, rmsf_af, label="AlphaFold Mutant", color='green', alpha=0.7)
+plt.plot(resids, rmsf_ch, label="Chimera Mutant", color='red', alpha=0.7)
+
+# Highlight the mutation site (Residue 104)
+plt.axvline(x=104, color='black', linestyle='--', label="Gln104Ala Site")
+
+plt.xlabel("Residue ID")
+plt.ylabel("RMSF (Å)")
+plt.title("Per-Residue Flexibility (RMSF) Comparison")
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
