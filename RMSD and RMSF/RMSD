@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # 1. Load Universes (Using .gro for topology and .xtc for trajectory)
-# Make sure the filenames below match exactly what you have on the cluster
 u_wt = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
 u_af = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
 u_ch = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
@@ -39,7 +38,7 @@ plt.grid(True, linestyle='--', alpha=0.6)
 plt.show()
 
 # 4. Slope Analysis for Drift (Last 100ns)
-# Assuming 1000 frames = 100ns (adjust if your saving frequency is different)
+# Assuming 1000 frames = 100ns
 def calc_drift(results_array, name):
     last_100 = results_array[-1000:, 2]
     slope = np.polyfit(range(len(last_100)), last_100, 1)[0]
