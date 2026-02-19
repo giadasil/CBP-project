@@ -9,17 +9,17 @@ from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import NearestNeighbors
 
-# 1. Load Universes (Paths from your original script)
+# 1. Load Universes
 u_wt = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
 u_af = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
 u_ch = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
 
-# 2. Pre-align trajectories to the WT reference structure [cite: 37]
+# 2. Pre-align trajectories to the WT reference structure
 ref_atoms = u_wt.select_atoms('name CA')
 for u in [u_wt, u_af, u_ch]:
     alignment = align.AlignTraj(u, u_wt, select='name CA', in_memory=True).run()
 
-# 3. Run PCA on the WT to define the "Reference Space" [cite: 37]
+# 3. Run PCA on the WT to define the "Reference Space"
 pc_wt = pca.PCA(u_wt, select='name CA').run()
 
 # Project all systems onto the first 3 WT axes
@@ -27,7 +27,7 @@ wt_3d = pc_wt.transform(u_wt.select_atoms('name CA'), n_components=3)
 af_3d = pc_wt.transform(u_af.select_atoms('name CA'), n_components=3)
 ch_3d = pc_wt.transform(u_ch.select_atoms('name CA'), n_components=3)
 
-# 4. Data Preparation for the Last 900 Frames [cite: 91]
+# 4. Data Preparation for the Last 900 Frames
 def get_pca_df(projections, label, last_frames=900):
     df = pd.DataFrame(projections, columns=['PC1', 'PC2', 'PC3'])
     df['System'] = label
@@ -48,7 +48,7 @@ X_scaled = scaler.fit_transform(df_all[['PC1', 'PC2', 'PC3']])
 # Initialize score to 0 to avoid NameError
 score = 0.0
 
-# Try a slightly different eps (e.g., 0.3 instead of 0.4)
+# Try different eps (e.g., 0.3 instead of 0.4)
 # Or adjust min_samples to be more or less restrictive
 dbscan = DBSCAN(eps=0.3, min_samples=30)
 df_all['Cluster'] = dbscan.fit_predict(X_scaled)
@@ -80,19 +80,3 @@ fig = px.scatter_3d(
 )
 fig.update_traces(marker=dict(size=3))
 fig.show()
-
-# Calculate the distance to the 30th nearest neighbor (matching min_samples=30)
-#neighbors = NearestNeighbors(n_neighbors=30)
-#neighbors_fit = neighbors.fit(X_scaled)
-#distances, indices = neighbors_fit.kneighbors(X_scaled)
-
-# Sort distances and plot
-#distances = np.sort(distances[:, -1], axis=0)
-#plt.figure(figsize=(8, 5))
-#plt.plot(distances)
-#plt.title("K-Distance Plot for EPS Selection")
-#plt.xlabel("Points sorted by distance")
-#plt.ylabel("30th Nearest Neighbor Distance")
-#plt.axhline(y=0.3, color='r', linestyle='--', label='Suggested EPS') # Example line
-#plt.legend()
-#plt.show()
