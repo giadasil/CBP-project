@@ -3,7 +3,6 @@ from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import numpy as np
 
-# 1. Load the Chimera Universe (the one with the most interesting dynamics)
 #u = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
 #u = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
 u = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
@@ -44,7 +43,6 @@ for i in range(n_clusters):
     u.atoms.write(f"wt_cluster_{i}_representative.pdb")
     print(f"Cluster {i} representative saved from frame {best_index}")
 
-    # Assuming 'labels' is the array of cluster assignments from the previous step
 total_points = len(labels)
 unique, counts = np.unique(labels, return_counts=True)
 percentages = (counts / total_points) * 100
