@@ -82,5 +82,5 @@ def plot_results(times, dists, name):
     plt.tight_layout()
     plt.show()
 
-# Run this using the c_dist and c_time variables from the previous script
+# Run this using the c_dist and c_time variables from the previous
 plot_results(c_time, c_dist, "Chimera")
