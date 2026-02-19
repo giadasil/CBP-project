@@ -33,7 +33,7 @@ fig_var = px.line(
     y=cum_var,
     labels={'x': 'Principal Component', 'y': 'Cumulative Variance'},
     title='Cumulative Explained Variance (WT Reference Space)',
-    range_x=[0, 100]  # Focus on the first 100 components as requested
+    range_x=[0, 100]  # Focus on the first 100 components
 )
 
 # Optional: Add a horizontal line at 70% or 80% to show the "elbow"
