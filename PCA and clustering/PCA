@@ -31,7 +31,7 @@ ch_3d = pc_wt.transform(u_ch.select_atoms('name CA'), n_components=3)
 def get_pca_df(projections, label, last_frames=900):
     df = pd.DataFrame(projections, columns=['first_comp', 'second_comp', 'third_comp'])
     df['System'] = label
-    # Keep only the last N frames as requested
+    # Keep only the last N frames
     return df.tail(last_frames)
 
 # Create DataFrames
@@ -43,7 +43,6 @@ df_ch = get_pca_df(ch_3d, 'Gln104Ala Chimera', last_frames=last_n)
 # Combine for a single interactive plot
 df_all = pd.concat([df_wt, df_af, df_ch])
 
-# Define the specific color mapping
 color_map = {
     'Wild Type': 'blue',           
     'Gln104Ala AF': 'green',
