@@ -1,54 +1,41 @@
 import MDAnalysis as mda
-from MDAnalysis.analysis import rms
+from MDAnalysis.analysis import rms, align
 import matplotlib.pyplot as plt
 import numpy as np
 
-# 1. Load Universes (Using .gro for topology and .xtc for trajectory)
+# 1. Load Universes
 u_wt = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
 u_af = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
 u_ch = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
 
-# 2. Setup RMSD Analysis
-# We use each system's first frame (ref_frame=0) as its own reference
-# to see how much each protein deviates from its starting model.
-R_wt = rms.RMSD(u_wt, select="backbone", ref_frame=0).run()
-R_af = rms.RMSD(u_af, select="backbone", ref_frame=0).run()
-R_ch = rms.RMSD(u_ch, select="backbone", ref_frame=0).run()
+# Define the reference: Wild Type frame 0 is our crystal structure
+# We select CA atoms
+ref_selection = "name CA"
+reference = u_wt.atoms.select_atoms(ref_selection)
 
-# 3. Plotting
+# 2. Align trajectories to the WT reference
+# This removes global translation and rotation relative to the crystal structure
+for u in [u_wt, u_af, u_ch]:
+    print(f"Aligning {u} to Wild Type crystal structure...")
+    align.AlignTraj(u, u_wt, select=ref_selection, in_memory=True).run()
+
+# 3. Setup RMSD analysis (all against WT reference)
+# Now we calculate RMSD of each system against the WT CA atoms
+R_wt = rms.RMSD(u_wt, u_wt, select=ref_selection, ref_frame=0).run()
+R_af = rms.RMSD(u_af, u_wt, select=ref_selection, ref_frame=0).run()
+R_ch = rms.RMSD(u_ch, u_wt, select=ref_selection, ref_frame=0).run()
+
+# 4. Plotting
 plt.figure(figsize=(12, 6))
+time_ns = R_wt.results.rmsd[:, 1] / 1000 # Convert ps to ns
 
-# Plot Wild Type
-plt.plot(R_wt.results.rmsd[:, 1] / 1000, R_wt.results.rmsd[:, 2], 
-         label="Wild Type (1BNR)", color='blue', alpha=0.7)
-
-# Plot AlphaFold Mutant
-plt.plot(R_af.results.rmsd[:, 1] / 1000, R_af.results.rmsd[:, 2], 
-         label="Mutant (AlphaFold)", color='green', alpha=0.7)
-
-# Plot Chimera Mutant
-plt.plot(R_ch.results.rmsd[:, 1] / 1000, R_ch.results.rmsd[:, 2], 
-         label="Mutant (Chimera)", color='red', alpha=0.7)
+plt.plot(time_ns, R_wt.results.rmsd[:, 2], label="Wild Type vs Crystal", color='blue', alpha=0.7)
+plt.plot(time_ns, R_af.results.rmsd[:, 2], label="AlphaFold vs WT Crystal", color='green', alpha=0.7)
+plt.plot(time_ns, R_ch.results.rmsd[:, 2], label="Chimera vs WT Crystal", color='red', alpha=0.7)
 
 plt.xlabel("Time (ns)", fontsize=12)
-plt.ylabel("Backbone RMSD (Å)", fontsize=12)
-plt.title("Backbone Stability Comparison (500 ns)", fontsize=14)
+plt.ylabel("RMSD (Å)", fontsize=12)
+plt.title("RMSD", fontsize=14)
 plt.legend()
 plt.grid(True, linestyle='--', alpha=0.6)
 plt.show()
-
-# 4. Slope Analysis for Drift (Last 100ns)
-# Assuming 1000 frames = 100ns
-def calc_drift(results_array, name):
-    last_100 = results_array[-1000:, 2]
-    slope = np.polyfit(range(len(last_100)), last_100, 1)[0]
-    return slope
-
-drift_wt = calc_drift(R_wt.results.rmsd, "WT")
-drift_af = calc_drift(R_af.results.rmsd, "AlphaFold")
-drift_ch = calc_drift(R_ch.results.rmsd, "Chimera")
-
-print(f"--- Final Drift Analysis (Å/frame) ---")
-print(f"Wild Type Drift:  {drift_wt:.6f}")
-print(f"AlphaFold Drift:  {drift_af:.6f}")
-print(f"Chimera Drift:    {drift_ch:.6f}")
