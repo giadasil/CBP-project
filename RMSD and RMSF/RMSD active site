@@ -12,18 +12,18 @@ align_sel = "name CA"
 # Active site: residues 104, Lys27, Arg59, His102
 active_site_sel = "resnum 27 59 102 104 and name CA"
 
-# 3. Align all trajectories to the WT crystal structure (Frame 0)
+# 3. Align all trajectories to the WT crystal structure
 # We align on CA to keep the protein centered, then measure local changes
 for u in [u_wt, u_af, u_ch]:
     align.AlignTraj(u, u_wt, select=align_sel, in_memory=True).run()
 
-# 4. Calculate RMSD for the active site specifically
+# 4. Calculate RMSD for the active site
 # Note: we use u_wt as the fixed reference for all three
 R_wt_active = rms.RMSD(u_wt, u_wt, select=active_site_sel, ref_frame=0).run()
 R_af_active = rms.RMSD(u_af, u_wt, select=active_site_sel, ref_frame=0).run()
 R_ch_active = rms.RMSD(u_ch, u_wt, select=active_site_sel, ref_frame=0).run()
 
-# 5. Plotting the Local Impact
+# 5. Plotting local impact
 plt.figure(figsize=(10, 5))
 time_ns = R_wt_active.results.rmsd[:, 1] / 1000
 
