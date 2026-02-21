@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 def calculate_rg(gro, xtc):
     u = mda.Universe(gro, xtc)
-    protein = u.select_atoms("protein")
+    protein = u.select_atoms("name CA")
     rg_values = []
     
     for ts in u.trajectory:
@@ -20,7 +20,7 @@ rg_af = calculate_rg("af_protein_only.gro", "Alpha_protein_only.xtc")
 # Plotting with your specific color scheme
 plt.figure(figsize=(10, 6))
 
-# Define time axis based on the longest trajectory (assuming 500ns total)
+# Define time axis based on the trajectory (500ns total)
 def get_time(data):
     return np.linspace(0, 500, len(data))
 
@@ -33,3 +33,7 @@ plt.title("Protein Compactness ($R_g$) over 500ns")
 plt.legend()
 plt.grid(True, linestyle='--', alpha=0.6)
 plt.show()
+
+print(f"Average Rg - WT: {np.mean(rg_wt):.3f} Å")
+print(f"Average Rg - AF: {np.mean(rg_af):.3f} Å")
+print(f"Average Rg - CH: {np.mean(rg_chim):.3f} Å")
