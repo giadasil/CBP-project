@@ -16,7 +16,7 @@ ref_atoms = u_wt.select_atoms('name CA')
 for u in [u_wt, u_af, u_ch]:
     alignment = align.AlignTraj(u, u_wt, select='name CA', in_memory=True).run()
 
-# 3. Run PCA on the WT to define the "Reference Space"
+# 3. Run PCA on the WT to define the reference space
 pc_wt = pca.PCA(u_wt, select='name CA').run()
 
 # Calculate variance for axis labels
@@ -27,7 +27,7 @@ var2 = (pc_wt.results.cumulated_variance[1] - pc_wt.results.cumulated_variance[0
 cum_var = pc_wt.results.cumulated_variance
 n_components = np.arange(len(cum_var)) + 1  # PCA components are 1-indexed
 
-# 2. Create the Cumulative Variance Plot
+# 2. Create the cumulative variance plot
 fig_var = px.line(
     x=n_components, 
     y=cum_var,
@@ -36,7 +36,7 @@ fig_var = px.line(
     range_x=[0, 100]  # Focus on the first 100 components
 )
 
-# Optional: Add a horizontal line at 70% or 80% to show the "elbow"
+# Add a horizontal line at 70% to show elbow
 fig_var.add_hline(y=0.7, line_dash="dash", annotation_text="70% Variance")
 
 fig_var.show()
