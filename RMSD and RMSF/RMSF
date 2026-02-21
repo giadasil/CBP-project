@@ -1,5 +1,5 @@
 import MDAnalysis as mda
-from MDAnalysis.analysis import rms,align
+from MDAnalysis.analysis import rms, align
 import matplotlib.pyplot as plt
 
 # 1. Load Universes
@@ -7,18 +7,26 @@ u_wt = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
 u_af = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
 u_ch = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
 
-# 2. RMSF Analysis (Focusing on C-alpha atoms for global backbone flexibility)
-# Note: We align the trajectory to the first frame to ensure we only measure 
-# internal flexibility, not global rotation/translation.
-def get_rmsf(u):
-    average = mda.analysis.align.AverageStructure(u, u, select='name CA', ref_frame=0).run()
-    aligner = mda.analysis.align.AlignTraj(u, average.results.universe, select='name CA').run()
+# Define the reference: WT Frame 0 (the "Crystal Structure")
+ref_selection = "name CA"
+# We create a static reference of the first frame
+u_wt.trajectory[0] 
+
+# 2. RMSF Analysis Function
+def get_rmsf_aligned_to_wt(u, reference_u):
+    # Align the mobile trajectory (u) to the WT Crystal Structure (reference_u)
+    print(f"Aligning {u} to WT reference...")
+    align.AlignTraj(u, reference_u, select=ref_selection, in_memory=True).run()
+    
+    # Calculate RMSF of the CA atoms
+    # This measures fluctuation around the average position after alignment
     rmsf = rms.RMSF(u.select_atoms("name CA")).run()
     return rmsf.results.rmsf
 
-rmsf_wt = get_rmsf(u_wt)
-rmsf_af = get_rmsf(u_af)
-rmsf_ch = get_rmsf(u_ch)
+# Run calculations using the WT universe as the fixed reference
+rmsf_wt = get_rmsf_aligned_to_wt(u_wt, u_wt)
+rmsf_af = get_rmsf_aligned_to_wt(u_af, u_wt)
+rmsf_ch = get_rmsf_aligned_to_wt(u_ch, u_wt)
 
 # 3. Plotting
 plt.figure(figsize=(12, 5))
@@ -28,12 +36,15 @@ plt.plot(resids, rmsf_wt, label="Wild Type", color='blue', alpha=0.7)
 plt.plot(resids, rmsf_af, label="AlphaFold Mutant", color='green', alpha=0.7)
 plt.plot(resids, rmsf_ch, label="Chimera Mutant", color='red', alpha=0.7)
 
-# Highlight the mutation site (Residue 104)
-plt.axvline(x=104, color='black', linestyle='--', label="Gln104Ala Site")
+# Highlight Mutation Site (104) and Active Site residues (27, 59, 102)
+plt.axvline(x=104, color='black', linestyle='--', alpha=0.5, label="Mutation 104")
+#active_site = [27, 59, 102]
+#for res in active_site:
+    #plt.axvline(x=res, color='orange', linestyle=':', alpha=0.4)
 
 plt.xlabel("Residue ID")
 plt.ylabel("RMSF (Å)")
-plt.title("Per-Residue Flexibility (RMSF) Comparison")
+plt.title("RMSF")
 plt.legend()
 plt.grid(True, alpha=0.3)
 plt.show()
