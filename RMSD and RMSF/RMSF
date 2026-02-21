@@ -7,14 +7,12 @@ u_wt = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
 u_af = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
 u_ch = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
 
-# Define the reference: WT Frame 0 (the "Crystal Structure")
+# Define the reference WT crystal structure (frame 0)
 ref_selection = "name CA"
-# We create a static reference of the first frame
 u_wt.trajectory[0] 
 
-# 2. RMSF Analysis Function
+# 2. RMSF analysis function
 def get_rmsf_aligned_to_wt(u, reference_u):
-    # Align the mobile trajectory (u) to the WT Crystal Structure (reference_u)
     print(f"Aligning {u} to WT reference...")
     align.AlignTraj(u, reference_u, select=ref_selection, in_memory=True).run()
     
@@ -36,11 +34,8 @@ plt.plot(resids, rmsf_wt, label="Wild Type", color='blue', alpha=0.7)
 plt.plot(resids, rmsf_af, label="AlphaFold Mutant", color='green', alpha=0.7)
 plt.plot(resids, rmsf_ch, label="Chimera Mutant", color='red', alpha=0.7)
 
-# Highlight Mutation Site (104) and Active Site residues (27, 59, 102)
+# Highlight mutation residue 104
 plt.axvline(x=104, color='black', linestyle='--', alpha=0.5, label="Mutation 104")
-#active_site = [27, 59, 102]
-#for res in active_site:
-    #plt.axvline(x=res, color='orange', linestyle=':', alpha=0.4)
 
 plt.xlabel("Residue ID")
 plt.ylabel("RMSF (Å)")
