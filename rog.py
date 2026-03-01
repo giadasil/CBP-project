@@ -2,38 +2,49 @@ import MDAnalysis as mda
 import numpy as np
 import matplotlib.pyplot as plt
 
-def calculate_rg(gro, xtc):
-    u = mda.Universe(gro, xtc)
+u_wt = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
+u_af = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
+u_ch = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
+
+# 1. Calculate start frame 
+total_frames = len(u_wt.trajectory)
+start_frame = total_frames - 9000
+
+def get_equilibrated_rg(u, start):
     protein = u.select_atoms("name CA")
     rg_values = []
-    
-    for ts in u.trajectory:
-        rg_values.append(protein.radius_of_gyration())
-    
+    # Loop only through the last 9000 frames
+    for ts in u.trajectory[start:]:
+        rg_values.append(u.atoms.radius_of_gyration())
     return np.array(rg_values)
 
-# Calculate for all three systems
-rg_wt = calculate_rg("wt_protein_only.gro", "wt_protein_only.xtc")
-rg_chim = calculate_rg("chimera_protein_only.gro", "chimera_protein_only.xtc")
-rg_af = calculate_rg("af_protein_only.gro", "Alpha_protein_only.xtc")
+# 2. Run analysis
+rg_wt_equil = get_equilibrated_rg(u_wt, start_frame)
+rg_af_equil = get_equilibrated_rg(u_af, start_frame)
+rg_ch_equil = get_equilibrated_rg(u_ch, start_frame)
 
-# Plotting with your specific color scheme
-plt.figure(figsize=(10, 6))
+# 3. Print final comparison table
+print(f"{'System':<20} | {'Mean Rg (Å)':<15} | {'Std Dev (Å)':<10}")
+print("-" * 50)
+systems_data = [
+    ("Wild Type", rg_wt_equil),
+    ("AlphaFold Mutant", rg_af_equil),
+    ("Chimera Mutant", rg_ch_equil)
+]
 
-# Define time axis based on the trajectory (500ns total)
-def get_time(data):
-    return np.linspace(0, 500, len(data))
+for name, data in systems_data:
+    print(f"{name:<20} | {np.mean(data):.3f} Å      | {np.std(data):.3f}")
 
-plt.plot(get_time(rg_wt), rg_wt, label="Wild Type", color='blue', alpha=0.7)
-plt.plot(get_time(rg_af), rg_af, label="AlphaFold Mutant", color='green', alpha=0.7)
-plt.plot(get_time(rg_chim), rg_chim, label="Chimera Mutant", color='red', alpha=0.7)
+plt.figure(figsize=(10, 5))
+time_equil = np.array([ts.time for ts in u_wt.trajectory[start_frame:]])
+time_ns = time_equil / 1000.0
+
+plt.plot(time_ns, rg_wt_equil, label="WT", color='blue', alpha=0.6)
+plt.plot(time_ns, rg_af_equil, label="AF Mutant", color='green', alpha=0.6)
+plt.plot(time_ns, rg_ch_equil, label="Chimera Mutant", color='red', alpha=0.6)
+
 plt.xlabel("Time (ns)")
 plt.ylabel("Radius of Gyration (Å)")
-plt.title("Protein Compactness ($R_g$) over 500ns")
+plt.title("Protein Compactness (Last 9000 Frames)")
 plt.legend()
-plt.grid(True, linestyle='--', alpha=0.6)
 plt.show()
-
-print(f"Average Rg - WT: {np.mean(rg_wt):.3f} Å")
-print(f"Average Rg - AF: {np.mean(rg_af):.3f} Å")
-print(f"Average Rg - CH: {np.mean(rg_chim):.3f} Å")
