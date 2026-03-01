@@ -20,12 +20,11 @@ for u in [u_wt, u_af, u_ch]:
     align.AlignTraj(u, u_wt, select=ref_selection, in_memory=True).run()
 
 # 3. Setup RMSD analysis (all against WT reference)
-# Now we calculate RMSD of each system against the WT CA atoms
+# we calculate RMSD of each system against the WT CA atoms
 R_wt = rms.RMSD(u_wt, u_wt, select=ref_selection, ref_frame=0).run()
 R_af = rms.RMSD(u_af, u_wt, select=ref_selection, ref_frame=0).run()
 R_ch = rms.RMSD(u_ch, u_wt, select=ref_selection, ref_frame=0).run()
 
-# 4. Plotting
 plt.figure(figsize=(12, 6))
 time_ns = R_wt.results.rmsd[:, 1] / 1000 # Convert ps to ns
 
