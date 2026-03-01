@@ -5,19 +5,18 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 
-# 1. Load Universes
 u_wt = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
 u_af = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
 u_ch = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
 
-# 2. Reference alignment (align all to WT frame 0)
+# Reference alignment to WT frame 0
 u_wt.trajectory[0] 
 ref_selection = 'name CA'
 for u in [u_wt, u_af, u_ch]:
     print(f"Aligning {u} to WT Crystal Structure...")
     align.AlignTraj(u, u_wt, select=ref_selection, in_memory=True).run()
 
-# 3. Principal Component Analysis (PCA)
+# Principal Component Analysis (PCA)
 # Define the PCA space using the Wild Type's trajectory
 pc_wt = pca.PCA(u_wt, select=ref_selection).run()
 
@@ -26,7 +25,7 @@ wt_3d = pc_wt.transform(u_wt.select_atoms(ref_selection), n_components=3)
 af_3d = pc_wt.transform(u_af.select_atoms(ref_selection), n_components=3)
 ch_3d = pc_wt.transform(u_ch.select_atoms(ref_selection), n_components=3)
 
-# 4. Data processing for plotting
+# Data processing for plotting
 def get_pca_df(projections, label, last_frames=9000):
     df = pd.DataFrame(projections, columns=['PC1', 'PC2', 'PC3'])
     df['System'] = label
@@ -39,7 +38,6 @@ df_all = pd.concat([
     get_pca_df(ch_3d, 'Gln104Ala Chimera')
 ])
 
-# 5. Interactive 3D visualization
 color_map = {'Wild Type': 'blue', 'Gln104Ala AF': 'green', 'Gln104Ala Chimera': 'red'}
 fig = px.scatter_3d(
     df_all, x='PC1', y='PC2', z='PC3', 
