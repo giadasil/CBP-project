@@ -6,37 +6,35 @@ import plotly.graph_objects as go
 import pandas as pd
 import plotly.express as px
 
-# 1. Load Universes
 u_wt = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
 u_af = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
 u_ch = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
 
-# 2. Pre-align trajectories to the WT reference structure
+# Pre-align trajectories to the WT reference structure
 # This ensures motions are internal and not just global rotation/translation
 ref_atoms = u_wt.select_atoms('name CA')
 for u in [u_wt, u_af, u_ch]:
     alignment = align.AlignTraj(u, u_wt, select='name CA', in_memory=True).run()
 
-# 3. Run PCA on the WT to define the "Reference Space"
+# Run PCA on the WT to define reference space
 pc_wt = pca.PCA(u_wt, select='name CA').run()
 
-# 2. Project onto 5 components (Required for the cosine content check)
+# Project onto 5 components (required for the cosine content check)
 n_comp = 3
 wt_proj = pc_wt.transform(u_wt.select_atoms('name CA'), n_components=n_comp)
 af_proj = pc_wt.transform(u_af.select_atoms('name CA'), n_components=n_comp)
 ch_proj = pc_wt.transform(u_ch.select_atoms('name CA'), n_components=n_comp)
 
-# 3. Define function for cosine content
+# Define function for cosine content
 def calculate_cosine_content(projections, n_components=5):
     # This now matches the shape of the projections above
     return [pca.cosine_content(projections, i) for i in range(n_components)]
 
-# 4. Compute values
+# Compute values
 cc_wt = calculate_cosine_content(wt_proj, n_components=n_comp)
 cc_af = calculate_cosine_content(af_proj, n_components=n_comp)
 cc_ch = calculate_cosine_content(ch_proj, n_components=n_comp)
 
-# 5. Plotting
 labels = [f'PC{i+1}' for i in range(n_comp)]
 x = np.arange(len(labels))
 width = 0.25
