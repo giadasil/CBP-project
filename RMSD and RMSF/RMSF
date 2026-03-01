@@ -7,39 +7,44 @@ u_wt = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
 u_af = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
 u_ch = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
 
-# Define the reference WT crystal structure (frame 0)
-ref_selection = "name CA"
-u_wt.trajectory[0] 
+# 2. Calculate the start frame for the last 9000
+total_frames = len(u_wt.trajectory)
+start_frame = total_frames - 9000
 
-# 2. RMSF analysis function
-def get_rmsf_aligned_to_wt(u, reference_u):
-    print(f"Aligning {u} to WT reference...")
-    align.AlignTraj(u, reference_u, select=ref_selection, in_memory=True).run()
+print(f"Total frames: {total_frames}")
+print(f"Analyzing from frame {start_frame} to {total_frames}")
+
+def get_last_9000_rmsf(u, reference_u, start):
+    # Align only the last 9000 frames to the WT crystal structure
+    print(f"Aligning {u} (frames {start} to end)...")
+    alignment = align.AlignTraj(u, reference_u, 
+                                select='name CA', 
+                                in_memory=True, 
+                                start=start).run()
     
-    # Calculate RMSF of the CA atoms
-    # This measures fluctuation around the average position after alignment
-    rmsf = rms.RMSF(u.select_atoms("name CA")).run()
+    # Calculate RMSF specifically for this slice
+    rmsf = rms.RMSF(u.select_atoms("name CA")).run(start=start)
     return rmsf.results.rmsf
 
-# Run calculations using the WT universe as the fixed reference
-rmsf_wt = get_rmsf_aligned_to_wt(u_wt, u_wt)
-rmsf_af = get_rmsf_aligned_to_wt(u_af, u_wt)
-rmsf_ch = get_rmsf_aligned_to_wt(u_ch, u_wt)
+# 3. Run analysis using WT as reference
+u_wt.trajectory[0]
+rmsf_wt = get_last_9000_rmsf(u_wt, u_wt, start_frame)
+rmsf_af = get_last_9000_rmsf(u_af, u_wt, start_frame)
+rmsf_ch = get_last_9000_rmsf(u_ch, u_wt, start_frame)
 
-# 3. Plotting
 plt.figure(figsize=(12, 5))
 resids = u_wt.residues.resids
 
-plt.plot(resids, rmsf_wt, label="Wild Type", color='blue', alpha=0.7)
-plt.plot(resids, rmsf_af, label="AlphaFold Mutant", color='green', alpha=0.7)
-plt.plot(resids, rmsf_ch, label="Chimera Mutant", color='red', alpha=0.7)
+plt.plot(resids, rmsf_wt, label="WT (Last 9000)", color='blue', alpha=0.7)
+plt.plot(resids, rmsf_af, label="AF Mutant (Last 9000)", color='green', alpha=0.7)
+plt.plot(resids, rmsf_ch, label="Chimera Mutant (Last 9000)", color='red', alpha=0.7)
 
-# Highlight mutation residue 104
-plt.axvline(x=104, color='black', linestyle='--', alpha=0.5, label="Mutation 104")
+# Highlight mutation site (104)
+plt.axvline(x=104, color='black', linestyle='--', alpha=0.5, label="Gln104Ala")
 
 plt.xlabel("Residue ID")
 plt.ylabel("RMSF (Å)")
-plt.title("RMSF")
+plt.title("Flexibility (Last 9000 Frames)")
 plt.legend()
 plt.grid(True, alpha=0.3)
 plt.show()
