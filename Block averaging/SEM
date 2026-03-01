@@ -1,0 +1,66 @@
+import MDAnalysis as mda
+from MDAnalysis.analysis import distances
+import numpy as np
+import matplotlib.pyplot as plt
+
+u_wt = mda.Universe("wt_protein_only.gro", "wt_protein_only.xtc")
+u_af = mda.Universe("af_protein_only.gro", "Alpha_protein_only.xtc")
+u_ch = mda.Universe("chimera_protein_only.gro", "chimera_protein_only.xtc")
+ 
+total_frames = len(u_wt.trajectory)
+start_frame = total_frames - 9000
+
+def calculate_sem_curve(data, max_blocks=50):
+    # Calculates SEM for different block counts to find the plateau
+    block_counts = np.arange(2, max_blocks + 1)
+    sems = []
+    
+    for n in block_counts:
+        block_size = len(data) // n
+        trimmed_data = data[:block_size * n]
+        blocks = trimmed_data.reshape(n, block_size)
+        block_means = np.mean(blocks, axis=1)
+        # SEM = Standard Deviation of block means / sqrt(number of blocks)
+        sem = np.std(block_means) / np.sqrt(n)
+        sems.append(sem)
+        
+    return block_counts, sems
+
+def get_distance_array(u, start, res1, res2):
+    # Extracts CA-CA distance for every frame in the slice
+    sel1 = u.select_atoms(f"resid {res1} and name CA")
+    sel2 = u.select_atoms(f"resid {res2} and name CA")
+    
+    distances = []
+    for ts in u.trajectory[start:]:
+        # Calculate Euclidean distance between the two atom positions
+        dist = np.linalg.norm(sel1.positions - sel2.positions)
+        distances.append(dist)
+    return np.array(distances)
+
+# Extract the full 9000-frame arrays
+# start_frame was defined as total_frames - 9000
+dist_wt_9000 = get_distance_array(u_wt, start_frame, 102, 104)
+dist_af_9000 = get_distance_array(u_af, start_frame, 102, 104)
+dist_ch_9000 = get_distance_array(u_ch, start_frame, 102, 104)
+
+systems = [
+    ("Wild Type", dist_wt_9000, 'blue'),
+    ("AF Mutant", dist_af_9000, 'green'),
+    ("Chimera", dist_ch_9000, 'red')
+]
+
+plt.figure(figsize=(10, 6))
+
+for name, data, color in systems:
+    counts, sems = calculate_sem_curve(data)
+    # We plot against block size (total frames / number of blocks)
+    block_sizes = len(data) // counts
+    plt.plot(block_sizes, sems, 'o-', label=name, color=color, markersize=4)
+
+plt.xlabel("Block Size (Number of Frames)", fontsize=12)
+plt.ylabel("Standard Error (SEM) [Å]", fontsize=12)
+plt.title("Block Averaging Convergence: Finding the SEM Plateau", fontsize=14)
+plt.legend()
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.show()
