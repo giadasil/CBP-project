@@ -3,86 +3,86 @@ from MDAnalysis.analysis import align
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import os
 
-def run_clustering_analysis(pdb_file, xtc_file, system_name, n_clusters=3, step=10):
-    print(f"\n--- Starting Analysis for {system_name} ---")
+def run_final_clustering(systems, n_clusters=3):
+    # Setup global reference for alignment (using first system's first frame)
+    ref_gro, _, _ = systems[0]
+    ref_u = mda.Universe(ref_gro)
     
-    u = mda.Universe(pdb_file, xtc_file)
-    
-    # Structural alignment
-    # Align all frames to the first frame CA atoms to remove global drift
-    print(f"Aligning {system_name} trajectory...")
-    u.trajectory[0]
-    align.AlignTraj(u, u, select='name CA', in_memory=True).run()
-    
-    # Extract CA coordinates for clustering
-    ca = u.select_atoms("name CA")
-    coords = []
-    for ts in u.trajectory[::step]:
-        coords.append(ca.positions.flatten())
-    coords = np.array(coords)
-    
-    # Perform k-means clustering
-    print(f"Clustering {system_name} into {n_clusters} states...")
-    km = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-    labels = km.fit_predict(coords)
-    
-    # Population analysis
-    total_points = len(labels)
-    unique, counts = np.unique(labels, return_counts=True)
-    percentages = (counts / total_points) * 100
-    
-    # Find and save representative centroids
-    for i in range(n_clusters):
-        cluster_indices = np.where(labels == i)[0]
-        if len(cluster_indices) == 0: continue
-        
-        center = km.cluster_centers_[i]
-        # Find frame in the subset closest to the mathematical center
-        distances = np.linalg.norm(coords[cluster_indices] - center, axis=1)
-        best_sub_index = np.argmin(distances)
-        
-        # Map back to original trajectory frame
-        original_frame = cluster_indices[best_sub_index] * step
-        
-        u.trajectory[original_frame]
-        output_name = f"{system_name.replace(' ', '_')}_cluster_{i}.pdb"
-        u.atoms.write(output_name)
-        print(f"  > Cluster {i} ({percentages[i]:.1f}%) saved as {output_name}")
+    all_percentages = []
+    system_names = []
 
-    return labels, percentages
+    for gro, xtc, name in systems:
+        if not os.path.exists(gro) or not os.path.exists(xtc):
+            continue
+            
+        print(f"\n--- Clustering: {name} ---")
+        u = mda.Universe(gro, xtc)
+        
+        # Determine last 9000 frames
+        start_frame = max(0, len(u.trajectory) - 9000)
+        
+        # 2. Production phase alignment to global reference
+        # This ensures Cluster 0 in WT is structurally comparable to clusters in Mutants
+        align.AlignTraj(u, ref_u, select='name CA', start=start_frame, in_memory=True).run()
+        
+        # 3. Coordinate extraction
+        ca = u.select_atoms("name CA")
+        coords = [ca.positions.flatten() for ts in u.trajectory[start_frame:]]
+        coords = np.array(coords)
+        
+        # 4. K-Means
+        km = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        labels = km.fit_predict(coords)
+        
+        # 5. Robust population calculation
+        unique, counts = np.unique(labels, return_counts=True)
+        raw_percs = (counts / len(labels)) * 100
+        
+        # Initialize full-length array with zeros
+        final_percs = np.zeros(n_clusters)
+        for cluster_id, p in zip(unique, raw_percs):
+            final_percs[cluster_id] = p
+            
+        all_percentages.append(final_percs)
+        system_names.append(name)
+        
+        # 6. Save Representative PDBs
+        for i in range(n_clusters):
+            idx = np.where(labels == i)[0]
+            if len(idx) == 0: continue
+            
+            center = km.cluster_centers_[i]
+            # Find frame in the subset closest to the mathematical center
+            dist = np.linalg.norm(coords[idx] - center, axis=1)
+            best_frame = start_frame + idx[np.argmin(dist)]
+            
+            u.trajectory[best_frame]
+            u.atoms.write(f"{name.replace(' ', '_')}_C{i}.pdb")
 
-# Execution
+    return system_names, all_percentages
+
 systems = [
     ("wt_protein_only.gro", "wt_protein_only.xtc", "Wild Type"),
     ("af_protein_only.gro", "Alpha_protein_only.xtc", "AlphaFold Mutant"),
     ("chimera_protein_only.gro", "chimera_protein_only.xtc", "Chimera Mutant")
 ]
 
-all_percentages = []
+names, populations = run_final_clustering(systems, n_clusters=3)
 
-for pdb, xtc, name in systems:
-    _, percs = run_clustering_analysis(pdb, xtc, name)
-    all_percentages.append(percs)
-
-labels = [f"Cluster {i}" for i in range(2)]
-wt_p = all_percentages[0]
-af_p = all_percentages[1]
-ch_p = all_percentages[2]
-
-x = np.arange(len(labels))
+# Visualization
+x = np.arange(3) # k=3
 width = 0.25
+colors = ['#3498db', '#2ecc71', '#e74c3c']
 
 fig, ax = plt.subplots(figsize=(10, 6))
-ax.bar(x - width, wt_p, width, label='Wild Type', color='blue', alpha=0.7)
-ax.bar(x, af_p, width, label='AlphaFold', color='green', alpha=0.7)
-ax.bar(x + width, ch_p, width, label='Chimera', color='red', alpha=0.7)
+for i, (name, p) in enumerate(zip(names, populations)):
+    ax.bar(x + (i - 1) * width, p, width, label=name, color=colors[i], edgecolor='black')
 
-ax.set_ylabel('Population Percentage (%)')
-ax.set_title('Conformational State Distribution: WT vs Mutants')
+ax.set_ylabel('Population (%)')
 ax.set_xticks(x)
-ax.set_xticklabels(labels)
+ax.set_xticklabels([f'Cluster {i}' for i in range(3)])
 ax.legend()
-plt.grid(axis='y', linestyle='--', alpha=0.6)
+plt.title('Final Cluster Populations (Last 9000 Frames, k=3)')
 plt.show()
